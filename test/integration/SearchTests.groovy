@@ -20,102 +20,106 @@
 *     Patheos.com - http://patheos.com
 * ----------------------------------------------------------------------------
 */
-
-import grails.test.*
-import org.grails.solr.Solr1
-import org.grails.solr.Solr2
-import org.grails.solr.Listing
 import org.apache.solr.client.solrj.SolrQuery
 import org.apache.solr.client.solrj.response.QueryResponse
+import org.grails.solr.Listing
+import org.grails.solr.Solr1
+import org.grails.solr.Solr2
 
 class SearchTests extends GroovyTestCase {
-	
-	def solrService
 
-	void testBasicQuery() { 
-		def s = new Solr1(astring: "testBasicQuery", aint: 2, afloat: 1.2f, adate: new Date()).save()
-		assert(s != null && s.id && s.id > 0)
-		
-		def result = solrService.search("id:${s.solrId()}")
+    def solrService
 
-		assertNotNull(result)		
-		assertNotNull(result.resultList)
-		assertNotNull(result.queryResponse)						
-		assert(result.resultList instanceof java.util.ArrayList)
-		assert(result.queryResponse instanceof org.apache.solr.client.solrj.response.QueryResponse)
-		assertEquals(result.resultList.size(), 1)
-		assertEquals(result.resultList[0].astring, s.astring)
-		assertEquals(result.queryResponse.getResults().size(), 1)
-		assertEquals(result.queryResponse.getResults()[0].getFieldValue( s.solrFieldName("astring")), s.astring)		
-	}
-	
-	void testFacetedQuery() {
-		new Solr1(astring: "one", aint: 9999, afloat: 1.2f, adate: new Date()).save()
-		new Solr1(astring: "one", aint: 9999, afloat: 1.2f, adate: new Date()).save()
-	  new Solr1(astring: "two", aint: 9999, afloat: 1.2f, adate: new Date()).save()	  
-	  
-	  def query = new SolrQuery("${Solr1.solrFieldName('aint')}:9999")
-	  query.facet = true
-	  query.addFacetField(Solr1.solrFieldName("astring"))
-	  def result = Solr1.searchSolr(query)
-	  
-	  def facetField = result.queryResponse.getFacetField(Solr1.solrFieldName("astring"))
-	  assertNotNull facetField
+    void testBasicQuery() {
+        def s = new Solr1(astring: "testBasicQuery", aint: 2, afloat: 1.2f, adate: new Date()).save(failOnError: true)
+        assert (s != null && s.id && s.id > 0)
 
-	  facetField.getValues().each { 
-      if(it.getName()  == "one") {
-        assertEquals(2, it.getCount() )
-      } else if (it.getName()  == "two") {
-        assertEquals(1, it.getCount() )
-      } 
-	  }	  
-	  
-	  // test facet method
-	  assertEquals(result.facet(Solr1, "astring"), facetField)
-	  
-	  // bad place obviously for this test, will move when I have time to clean up and refactor
-	  // the tests  
-	  assertEquals(result.total, result.queryResponse.results.getNumFound())
-	}
-	
-	
-	
-	void testQuerySpatial() {
-		def listing1 = new Listing(title: "Church of Castle Rock", address1: "1 My St", city: "Castle Rock", state: "CO", postalCode: "80104", country: "US", latitude: 39.37436, longitude: -104.859929).save()
+        def server = solrService.server
+        server.commit()
+
+        def result = solrService.search("id:${s.solrId()}")
+
+        assertNotNull(result)
+        assertNotNull(result.resultList)
+        assertNotNull(result.queryResponse)
+        assert (result.resultList instanceof ArrayList)
+        assert (result.queryResponse instanceof QueryResponse)
+        assertEquals(1, result.resultList.size())
+        assertEquals(s.astring, result.resultList[0].astring)
+        assertEquals(1, result.queryResponse.getResults().size())
+        assertEquals(s.astring, result.queryResponse.getResults()[0].getFieldValue(s.solrFieldName("astring")))
+    }
+
+    void testFacetedQuery() {
+        new Solr1(astring: "one", aint: 9999, afloat: 1.2f, adate: new Date()).save()
+        new Solr1(astring: "one", aint: 9999, afloat: 1.2f, adate: new Date()).save()
+        new Solr1(astring: "two", aint: 9999, afloat: 1.2f, adate: new Date()).save()
+
+        def query = new SolrQuery("${Solr1.solrFieldName('aint')}:9999")
+        query.facet = true
+        query.addFacetField(Solr1.solrFieldName("astring"))
+        def result = Solr1.searchSolr(query)
+
+        def facetField = result.queryResponse.getFacetField(Solr1.solrFieldName("astring"))
+        assertNotNull facetField
+
+        facetField.getValues().each {
+            if (it.getName() == "one") {
+                assertEquals(2, it.getCount())
+            } else if (it.getName() == "two") {
+                assertEquals(1, it.getCount())
+            }
+        }
+
+        // test facet method
+        assertEquals(result.facet(Solr1, "astring"), facetField)
+
+        // bad place obviously for this test, will move when I have time to clean up and refactor
+        // the tests
+        assertEquals(result.total, result.queryResponse.results.getNumFound())
+    }
+
+
+    void testQuerySpatial() {
+        def listing1 = new Listing(title: "Church of Castle Rock", address1: "1 My St", city: "Castle Rock", state: "CO", postalCode: "80104", country: "US", latitude: 39.37436, longitude: -104.859929).save()
         def listing2 = new Listing(title: "Church of Parker", address1: "2 My St", city: "Parker", state: "CO", postalCode: "80104", country: "US", latitude: 39.517363, longitude: -104.785984).save()
-		
-		assertNotNull(listing1)
-		assertNotNull(listing2)
-		listing1.indexSolr()
-		listing2.indexSolr()
-		//-104.9847034, 39.7391536
-		def result = solrService.querySpatial("id:${listing1.solrId()} OR id:${listing2.solrId()}", 39.7391536d, -104.9847034d, 100)
-		
-		assertNotNull(result)		
-		assertNotNull(result.resultList)
-		assertNotNull(result.queryResponse)						
-		assert(result.resultList instanceof java.util.ArrayList)
-		assert(result.queryResponse instanceof org.apache.solr.client.solrj.response.QueryResponse)
-		assertEquals(result.resultList.size(), 2)
-		assertNotNull(result.resultList[0].dist)
-		assert(result.resultList[0].dist > 0)
-		assert(result.resultList[0].id == listing2.id)
-	}
-	
-	void testStreamingUpdateServer() {
-		def streamingServer = solrService.getStreamingUpdateServer(20,3)
-		def solrServer = solrService.getServer()
-		assertNotNull(solrServer)
-		
-		solrServer.deleteByQuery("astring:testingstreamingupdateserver")
-		100.times {
-			def s = new Solr2(astring: "testingstreamingupdateserver", aint: 2, afloat: 1.2f, adate: new Date()).save()
-			assert(s != null && s.id && s.id > 0)		
-			s.indexSolr(streamingServer)	
-		}
-		streamingServer.commit()
-		def result = Solr2.searchSolr("${Solr2.solrFieldName("astring")}:testingstreamingupdateserver")
-		assertEquals(100, result.queryResponse.getResults().numFound);
 
-	}
+        assertNotNull(listing1)
+        assertNotNull(listing2)
+        listing1.indexSolr()
+        listing2.indexSolr()
+
+        def server = solrService.server
+        server.commit()
+
+        //-104.9847034, 39.7391536
+        def result = solrService.querySpatial("id:${listing1.solrId()} OR id:${listing2.solrId()}", 39.7391536d, -104.9847034d, 100)
+
+        assertNotNull(result)
+        assertNotNull(result.resultList)
+        assertNotNull(result.queryResponse)
+        assert (result.resultList instanceof ArrayList)
+        assert (result.queryResponse instanceof QueryResponse)
+        assertEquals(2, result.resultList.size())
+        assertNotNull(result.resultList[0].dist)
+        assert (result.resultList[0].dist > 0)
+        assert (result.resultList[0].id == listing2.id)
+    }
+
+    void testStreamingUpdateServer() {
+        def streamingServer = solrService.getStreamingUpdateServer(20, 3)
+        def solrServer = solrService.getServer()
+        assertNotNull(solrServer)
+
+        solrServer.deleteByQuery("astring:testingstreamingupdateserver")
+        100.times {
+            def s = new Solr2(astring: "testingstreamingupdateserver", aint: 2, afloat: 1.2f, adate: new Date()).save()
+            assert (s != null && s.id && s.id > 0)
+            s.indexSolr(streamingServer)
+        }
+        streamingServer.commit()
+        def result = Solr2.searchSolr("${Solr2.solrFieldName("astring")}:testingstreamingupdateserver")
+        assertEquals(100, result.queryResponse.getResults().numFound)
+
+    }
 }

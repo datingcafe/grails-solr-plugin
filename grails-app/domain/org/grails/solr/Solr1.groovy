@@ -22,18 +22,18 @@
 */
 
 package org.grails.solr
+
 class Solr1 {
-  static enableSolrSearch = true
-  static solrAutoIndex = true
-  
-  String astring
-  int aint
-  long along
-  Date adate
-  float afloat
+    static enableSolrSearch = true
+    static solrAutoIndex = true
 
+    String astring
+    int aint
+    long along
+    Date adate
+    float afloat
 
-  String solrTitle() {
-    "myobjecttitle"
-  }
+    String solrTitle() {
+        "myobjecttitle"
+    }
 }

@@ -32,62 +32,66 @@ def solrStopPort = "8079"
 def solrPort = "8983"
 def solrHost = "localhost"
 
-target ( startsolr: "Start Solr Jetty Instance") {
+target(startsolr: "Start Solr Jetty Instance") {
     depends("stopsolr")
     depends("init")
-		
-		// overlay the schema.xml config file in the apps grails-app/conf/solr directory (and other conf files)
-		Ant.copy(todir:"${solrHome}/solr/conf", failonerror: false) {
-			fileset( dir: "${basedir}/grails-app/conf/solr")
-		}
+
+    def solrLogDir = "${solrHome}/logs"
+    if (!new File(solrLogDir)?.exists()) {
+        Ant.mkdir(dir: "${solrLogDir}")
+    }
+
+    // overlay the schema.xml config file in the apps grails-app/conf/solr directory (and other conf files)
+    Ant.copy(todir: "${solrHome}/solr/conf", failonerror: false) {
+        fileset(dir: "${basedir}/grails-app/conf/solr")
+    }
+
+    // pause just for a bit more time to be sure Solr Stopped
+    Thread.sleep(1000)
+
+    // start it up
+    Ant.java(jar: "${solrHome}/start.jar", dir: "${solrHome}", fork: true, spawn: true) {
+        jvmarg(value: "-DSTOP.PORT=${solrStopPort}")
+        jvmarg(value: "-DSTOP.KEY=secret")
+        arg(line: "etc/jetty-logging.xml etc/jetty.xml")
+    }
 
 
-		// pause just for a bit more time to be sure Solr Stopped
-		Thread.sleep(1000)
-
-		// start it up
-		Ant.java ( jar:"${solrHome}/start.jar", dir: "${solrHome}", fork:true, spawn:true) {
-			jvmarg(value:"-DSTOP.PORT=${solrStopPort}")
-			jvmarg(value:"-DSTOP.KEY=secret")
-			arg(line:"etc/jetty-logging.xml etc/jetty.xml")
-		}
-		
-			
-		println "Starting Solr - Solr HOME is ${solrHome}"
-		println "-----------"
-		println "Solr logs can be found here: ${solrHome}/logs"
-		println "Console access: http://localhost:${solrPort}/solr/"
-		println "-----------"
+    println "Starting Solr - Solr HOME is ${solrHome}"
+    println "-----------"
+    println "Solr logs can be found here: ${solrHome}/logs"
+    println "Console access: http://localhost:${solrPort}/solr/"
+    println "-----------"
 }
 
-setDefaultTarget ( "startsolr" )
+setDefaultTarget("startsolr")
 
 target(checkport: "Test port for solr") {
-  condition(property: "solr.not.running") {
-    not {
-      socket(server: solrHost, port: solrStopPort)      
+    condition(property: "solr.not.running") {
+        not {
+            socket(server: solrHost, port: solrStopPort)
+        }
     }
-  }
 }
 
 target(stopsolr: "Stop Solr") {
-  depends("checkport", "init")
+    depends("checkport", "init")
 
-	if ( !Boolean.valueOf(Ant.project.properties.'solr.not.running') ) {
-    println "Stopping Solr..."
-  	java ( jar:"${solrHome}/start.jar", dir: "${solrHome}", fork:true) {
-      jvmarg(value:"-DSTOP.PORT=${solrStopPort}")
-  		jvmarg(value:"-DSTOP.KEY=secret")
-  		arg(value: "--stop")
-  	}
-	}
- 
+    if (!Boolean.valueOf(Ant.project.properties.'solr.not.running')) {
+        println "Stopping Solr..."
+        java(jar: "${solrHome}/start.jar", dir: "${solrHome}", fork: true) {
+            jvmarg(value: "-DSTOP.PORT=${solrStopPort}")
+            jvmarg(value: "-DSTOP.KEY=secret")
+            arg(value: "--stop")
+        }
+    }
+
 }
 
 target(init: "Create the solr-home directory") {
-  // copy over the resources for solr home
-	Ant.mkdir(dir: "${solrHome}")
-	Ant.copy(todir:"${solrHome}") {
-		fileset( dir: "${pluginBasedir}/src/solr-local", )
-	}
+    // copy over the resources for solr home
+    Ant.mkdir(dir: "${solrHome}")
+    Ant.copy(todir: "${solrHome}") {
+        fileset(dir: "${pluginBasedir}/src/solr-local",)
+    }
 }
